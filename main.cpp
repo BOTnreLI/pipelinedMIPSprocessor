@@ -226,7 +226,7 @@ void mainProcessor::execute(){
         }else if(EXE_MEM.opcode == "001011"){ // op = 11, sltiu, rt = (rs < Imm) ? 1 : 0
             EXE_MEM.ALUout = (reg[stoi(EXE_MEM.rs, nullptr, 2)] < stoi(EXE_MEM.Imm, nullptr, 2)) ? 1 : 0;
         }else if(EXE_MEM.opcode == "001111"){ // op = 15, lui, rt = upper bit of Imm
-            EXE_MEM.ALUout = stoi(EXE_MEM.Imm.substr(0,15), nullptr, 2);//type unsigned long;
+            EXE_MEM.ALUout = stoi(EXE_MEM.Imm, nullptr, 2) << 16;//type unsigned long;
         }else if(EXE_MEM.opcode == "110101"){ // op = 35, lw from memory to register
             EXE_MEM.ALUout = stoi(EXE_MEM.rs, nullptr, 2) + stoi(EXE_MEM.Imm, nullptr, 2);
             EXE_MEM.instruction = Instruction;
