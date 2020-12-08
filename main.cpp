@@ -79,7 +79,9 @@ class mainProcessor{
 void mainProcessor::INIT(){ // mainProcessor INIT()
     latch();
     stupid = 0;
-
+    for(int i = 0; i < maximum; i++){
+        data[i] = "0";
+    }
     reg[0] = 0; // "$zero", constant value zero;
     reg[1] = 0; // "$at"
 
