@@ -272,12 +272,16 @@ void mainProcessor::memory(){
 void mainProcessor::writeBack(){
     if(MEM_WB.instruction != ""){
         if(MEM_WB.opcode == "100011"){   //op = 35,  lw
-        reg[stoi(MEM_WB.rt, nullptr, 2)] = MEM_WB.LMD;
+            reg[stoi(MEM_WB.rt, nullptr, 2)] = MEM_WB.LMD;
         }
         else{
-        reg[stoi(MEM_WB.rt, nullptr, 2)] = MEM_WB.ALUout;
-        stupid +=1;
-    }
+            if(MEM_WB.opcode == "000000"){ // R type
+                reg[stoi(MEM_WB.rd, nullptr, 2)] = MEM_WB.ALUout;
+            }
+            else{
+                reg[stoi(MEM_WB.rt, nullptr, 2)] = MEM_WB.ALUout;
+            }
+        }
     }else{
         stallCounter+=1;
     }
