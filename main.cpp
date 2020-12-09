@@ -29,6 +29,7 @@ class latch{
         int finishedCounter;
         latch();
         void signExtendtion();
+        bool hazardFlag;
 
 };
 
@@ -53,6 +54,7 @@ latch::latch(){  // INIT()
     LMD = 0;
     PC = 0;
     finishedCounter = 0;
+
 }
 
 class mainProcessor{
@@ -61,6 +63,7 @@ class mainProcessor{
         latch ID_EXE;
         latch EXE_MEM;
         latch MEM_WB;
+        bool hazardFlag;
         string instruction[maximumMEM];
         string data[maximumMEM];
         void fetch();
@@ -79,9 +82,10 @@ class mainProcessor{
 void mainProcessor::INIT(){ // mainProcessor INIT()
     latch();
     stupid = 0;
-    for(int i = 0; i < maximum; i++){
-        data[i] = "0";
+    for(int i=0; i < maximum; i++){
+        data[i] = "0" ;
     }
+    hazardFlag = false;
     reg[0] = 0; // "$zero", constant value zero;
     reg[1] = 0; // "$at"
 
@@ -139,34 +143,30 @@ void mainProcessor::fetch(){
        }else{
            IF_ID.PC += 1;
        }
-   }else{
-       stallCounter += 1;
    }
 }
 
 void mainProcessor::decode(){
     ID_EXE.instruction = IF_ID.instruction;
-    EXE_MEM.instruction = ID_EXE.instruction;
+    // if hazard happened, add NOP
     if(ID_EXE.instruction != ""  && ID_EXE.instruction != "0"){
         //slicing the string.
-        EXE_MEM.opcode = ID_EXE.instruction.substr(0, 6); //0-6
+        ID_EXE.opcode = ID_EXE.instruction.substr(0, 6); //0-6
     
         if(ID_EXE.opcode == "000000"){ // R- type
-            EXE_MEM.rt = (ID_EXE.instruction.substr(12, 5));
-            EXE_MEM.rs = (ID_EXE.instruction.substr(7, 5));
-            EXE_MEM.rd = (ID_EXE.instruction.substr(17, 5));
-            EXE_MEM.func = (ID_EXE.instruction.substr(27, 6));
-            EXE_MEM.shamt = (ID_EXE.instruction.substr(22, 5));
+            ID_EXE.rt = (ID_EXE.instruction.substr(12, 5));
+            ID_EXE.rs = (ID_EXE.instruction.substr(7, 5));
+            ID_EXE.rd = (ID_EXE.instruction.substr(17, 5));
+            ID_EXE.func = (ID_EXE.instruction.substr(27, 6));
+            ID_EXE.shamt = (ID_EXE.instruction.substr(22, 5));
         }else{ // I- type
-            EXE_MEM.rs = (ID_EXE.instruction.substr(6, 5)); // 6 - 10
-            EXE_MEM.rt = (ID_EXE.instruction.substr(11, 5)); //11 - 15
-            EXE_MEM.Imm = (ID_EXE.instruction.substr(16, 16)); // 16 - 31
+            ID_EXE.rs = (ID_EXE.instruction.substr(6, 5)); // 6 - 10
+            ID_EXE.rt = (ID_EXE.instruction.substr(11, 5)); //11 - 15
+            ID_EXE.Imm = (ID_EXE.instruction.substr(16, 16)); // 16 - 31
             if(EXE_MEM.instruction != ""){
                 EXE_MEM.signExtendtion();
             }
         }
-    }else{
-        stallCounter += 1;
     }
 }
 void mainProcessor::execute(){
@@ -174,79 +174,71 @@ void mainProcessor::execute(){
     /*
     string rs, rd, rt, opcode, func, Imm, shamt
     */
-    
-    EXE_MEM.instruction = ID_EXE.instruction;
-    EXE_MEM.rs = ID_EXE.rs;
-    EXE_MEM.rt = ID_EXE.rt;
-    EXE_MEM.rd = ID_EXE.rd;
-    EXE_MEM.Imm = ID_EXE.Imm;
-    EXE_MEM.opcode = ID_EXE.opcode;
-    EXE_MEM.func = ID_EXE.func;
-    EXE_MEM.shamt = ID_EXE.shamt;
-    
-    // string to interger
-    string Instruction = ID_EXE.instruction;
-
-    
-
-    if(EXE_MEM.opcode == "000000"){ // R - type
-        if(EXE_MEM.func == "100000"){ // add => rd = rs + rt
-            EXE_MEM.ALUout = reg[stoi(EXE_MEM.rs, nullptr, 2)] + reg[stoi(EXE_MEM.rt, nullptr, 2)];
-        }else if(EXE_MEM.func == "100010"){ // sub => rd = rs - rt
-            EXE_MEM.ALUout = reg[stoi(EXE_MEM.rs, nullptr, 2)] - reg[stoi(EXE_MEM.rt, nullptr, 2)];
-        }else if(EXE_MEM.func == "100100"){ // and => rd = rs & rt
-            EXE_MEM.ALUout = reg[stoi(EXE_MEM.rs, nullptr, 2)] & reg[stoi(EXE_MEM.rt, nullptr, 2)];
-        }else if(EXE_MEM.func == "100101"){ // or => rd = rs | rt
-            EXE_MEM.ALUout = reg[stoi(EXE_MEM.rs, nullptr, 2)] | reg[stoi(EXE_MEM.rt, nullptr, 2)];
-        }else if(EXE_MEM.func == "000000"){ // sll => rd = rt << shamt
-            EXE_MEM.ALUout = reg[stoi(EXE_MEM.rt, nullptr, 2)] << stoi(EXE_MEM.shamt, nullptr, 2);
-        }else if(EXE_MEM.func == "000010"){ // srl => rd = rt >> shamt
-            EXE_MEM.ALUout = reg[stoi(EXE_MEM.rt, nullptr, 2)] >> stoi(EXE_MEM.shamt, nullptr, 2);
-        }else if(EXE_MEM.func == "011000"){ //mul => {Hi, Lo} = rs * rt
-            EXE_MEM.ALUout = stoi(EXE_MEM.rs, nullptr, 2) * stoi(EXE_MEM.rt, nullptr, 2);
-        }
-        else{
-            stallCounter += 1;
-        }
-    }else{ // I - type
-        if(EXE_MEM.opcode == "000100"){ // op = 4, beq, if rs == rt, pc + 4
-            if(reg[stoi(EXE_MEM.rs, nullptr, 2)] == reg[stoi(EXE_MEM.rt, nullptr, 2)]){
-                EXE_MEM.PC = EXE_MEM.PC + stoi(EXE_MEM.Imm, nullptr, 2) +1;
-                EXE_MEM.cond = 1;
+    //sll $zero $zero 0
+        //default: false
+        EXE_MEM.instruction = ID_EXE.instruction;
+        EXE_MEM.rs = ID_EXE.rs;
+        EXE_MEM.rt = ID_EXE.rt;
+        EXE_MEM.rd = ID_EXE.rd;
+        EXE_MEM.Imm = ID_EXE.Imm;
+        EXE_MEM.opcode = ID_EXE.opcode;
+        EXE_MEM.func = ID_EXE.func;
+        EXE_MEM.shamt = ID_EXE.shamt;
+        
+        if(EXE_MEM.opcode == "000000"){ // R - type
+            if(EXE_MEM.func == "100000"){ // add => rd = rs + rt
+                EXE_MEM.ALUout = reg[stoi(EXE_MEM.rs, nullptr, 2)] + reg[stoi(EXE_MEM.rt, nullptr, 2)];
+            }else if(EXE_MEM.func == "100010"){ // sub => rd = rs - rt
+                EXE_MEM.ALUout = reg[stoi(EXE_MEM.rs, nullptr, 2)] - reg[stoi(EXE_MEM.rt, nullptr, 2)];
+            }else if(EXE_MEM.func == "100100"){ // and => rd = rs & rt
+                EXE_MEM.ALUout = reg[stoi(EXE_MEM.rs, nullptr, 2)] & reg[stoi(EXE_MEM.rt, nullptr, 2)];
+            }else if(EXE_MEM.func == "100101"){ // or => rd = rs | rt
+                EXE_MEM.ALUout = reg[stoi(EXE_MEM.rs, nullptr, 2)] | reg[stoi(EXE_MEM.rt, nullptr, 2)];
+            }else if(EXE_MEM.func == "000000"){ // sll => rd = rt << shamt
+                EXE_MEM.ALUout = reg[stoi(EXE_MEM.rt, nullptr, 2)] << stoi(EXE_MEM.shamt, nullptr, 2);
+            }else if(EXE_MEM.func == "000010"){ // srl => rd = rt >> shamt
+                EXE_MEM.ALUout = reg[stoi(EXE_MEM.rt, nullptr, 2)] >> stoi(EXE_MEM.shamt, nullptr, 2);
+            }else if(EXE_MEM.func == "011000"){ //mul => {Hi, Lo} = rs * rt
+                EXE_MEM.ALUout = stoi(EXE_MEM.rs, nullptr, 2) * stoi(EXE_MEM.rt, nullptr, 2);
+            }
+        }else{ // I - type
+            if(EXE_MEM.opcode == "000100"){ // op = 4, beq, if rs == rt, pc + 4
+                if(reg[stoi(EXE_MEM.rs, nullptr, 2)] == reg[stoi(EXE_MEM.rt, nullptr, 2)]){
+                    EXE_MEM.PC = EXE_MEM.PC + stoi(EXE_MEM.Imm, nullptr, 2) +1;
+                    EXE_MEM.cond = 1;
+                }
+            }
+            else if(EXE_MEM.opcode == "001000"){ //op = 8, addi, rt = rs + Imm;
+                EXE_MEM.ALUout = reg[stoi(EXE_MEM.rs, nullptr, 2)] + stoi(EXE_MEM.Imm, nullptr, 2);
+            }else if(EXE_MEM.opcode == "001100"){ // op = 12, andi rt = rs & Imm;
+                EXE_MEM.ALUout = reg[stoi(EXE_MEM.rs, nullptr, 2)] & stoi(EXE_MEM.Imm, nullptr, 2);
+            }else if(EXE_MEM.opcode == "001101"){ // op = 13, ori, rt = rs | Imm;
+                EXE_MEM.ALUout = reg[stoi(EXE_MEM.rs, nullptr, 2)] | stoi(EXE_MEM.Imm, nullptr, 2);
+            }else if(EXE_MEM.opcode == "001010"){ // op = 10, slti, rt = (rs < Imm) ? 1 ; 0
+                EXE_MEM.ALUout = (reg[stoi(EXE_MEM.rs, nullptr, 2)] < stoi(EXE_MEM.Imm, nullptr, 2)) ? 1 : 0;
+            }else if(EXE_MEM.opcode == "001011"){ // op = 11, sltiu, rt = (rs < Imm) ? 1 : 0
+                EXE_MEM.ALUout = (reg[stoi(EXE_MEM.rs, nullptr, 2)] < stoi(EXE_MEM.Imm, nullptr, 2)) ? 1 : 0;
+            }else if(EXE_MEM.opcode == "001111"){ // op = 15, lui, rt = upper bit of Imm
+                EXE_MEM.ALUout = stoi(EXE_MEM.Imm, nullptr, 2) << 16;
+                //type unsigned long;
+                //"000,,,32,,,00"
+            }else if(EXE_MEM.opcode == "100011"){ // op = 35, lw from memory to register
+                EXE_MEM.ALUout = stoi(EXE_MEM.rs, nullptr, 2) + stoi(EXE_MEM.Imm, nullptr, 2);
+                EXE_MEM.instruction = IF_ID.instruction;
+                EXE_MEM.rt = stoi(EXE_MEM.rt, nullptr, 2);
+            }else if(EXE_MEM.opcode == "101111"){ // op = 43, sw register to memory
+                EXE_MEM.ALUout = stoi(EXE_MEM.rs, nullptr, 2) + stoi(EXE_MEM.Imm, nullptr, 2);
+                EXE_MEM.instruction = IF_ID.instruction;
+                EXE_MEM.rt = stoi(EXE_MEM.rt, nullptr, 2);
             }
         }
-        else if(EXE_MEM.opcode == "001000"){ //op = 8, addi, rt = rs + Imm;
-            EXE_MEM.ALUout = reg[stoi(EXE_MEM.rs, nullptr, 2)] + stoi(EXE_MEM.Imm, nullptr, 2);
-        }else if(EXE_MEM.opcode == "001100"){ // op = 12, andi rt = rs & Imm;
-            EXE_MEM.ALUout = reg[stoi(EXE_MEM.rs, nullptr, 2)] & stoi(EXE_MEM.Imm, nullptr, 2);
-        }else if(EXE_MEM.opcode == "001101"){ // op = 13, ori, rt = rs | Imm;
-            EXE_MEM.ALUout = reg[stoi(EXE_MEM.rs, nullptr, 2)] | stoi(EXE_MEM.Imm, nullptr, 2);
-        }else if(EXE_MEM.opcode == "001010"){ // op = 10, slti, rt = (rs < Imm) ? 1 ; 0
-            EXE_MEM.ALUout = (reg[stoi(EXE_MEM.rs, nullptr, 2)] < stoi(EXE_MEM.Imm, nullptr, 2)) ? 1 : 0;
-        }else if(EXE_MEM.opcode == "001011"){ // op = 11, sltiu, rt = (rs < Imm) ? 1 : 0
-            EXE_MEM.ALUout = (reg[stoi(EXE_MEM.rs, nullptr, 2)] < stoi(EXE_MEM.Imm, nullptr, 2)) ? 1 : 0;
-        }else if(EXE_MEM.opcode == "001111"){ // op = 15, lui, rt = upper bit of Imm
-            EXE_MEM.ALUout = stoi(EXE_MEM.Imm, nullptr, 2) << 16;//type unsigned long;
-        }else if(EXE_MEM.opcode == "110101"){ // op = 35, lw from memory to register
-            EXE_MEM.ALUout = stoi(EXE_MEM.rs, nullptr, 2) + stoi(EXE_MEM.Imm, nullptr, 2);
-            EXE_MEM.instruction = Instruction;
-            EXE_MEM.rt = stoi(EXE_MEM.rt, nullptr, 2);
-        }else if(EXE_MEM.opcode == "101011"){ // op = 43, sw register to memory
-            EXE_MEM.ALUout = stoi(EXE_MEM.rs, nullptr, 2) + stoi(EXE_MEM.Imm, nullptr, 2);
-            EXE_MEM.instruction = Instruction;
-            EXE_MEM.rt = stoi(EXE_MEM.rt, nullptr, 2);
-        }
-        else{
-            stallCounter += 1;
-        }
-    }
+    
 }
 
 void mainProcessor::memory(){
     //on do lw, sw here
     //others parameter pass to next stage
     //exe_mem -> mem_wb
-    MEM_WB.instruction = EXE_MEM.instruction;
     MEM_WB.rs = EXE_MEM.rs;
     MEM_WB.rt = EXE_MEM.rt;
     MEM_WB.rd = EXE_MEM.rd;
@@ -254,23 +246,23 @@ void mainProcessor::memory(){
     MEM_WB.opcode = EXE_MEM.opcode;
     MEM_WB.func = EXE_MEM.func;
     MEM_WB.shamt = EXE_MEM.shamt;
-    MEM_WB.ALUout = EXE_MEM.ALUout;
 
     if(EXE_MEM.instruction != ""){
         MEM_WB.ALUout = EXE_MEM.ALUout;
-    MEM_WB.instruction = EXE_MEM.instruction;
-    if(EXE_MEM.instruction.substr(0, 6) == "100011"){ //lw
-        MEM_WB.LMD = stoi(data[EXE_MEM.ALUout]);
-    }else if(EXE_MEM.instruction.substr(0, 6) == "101111"){ // sw
-        data[EXE_MEM.ALUout] = EXE_MEM.rt;
+        MEM_WB.instruction = EXE_MEM.instruction;
+        if(EXE_MEM.instruction.substr(0, 6) == "100011"){ //lw
+            MEM_WB.LMD = stoi(data[EXE_MEM.ALUout], nullptr, 2);
+        }else if(EXE_MEM.instruction.substr(0, 6) == "101111"){ // sw
+            data[EXE_MEM.ALUout] = EXE_MEM.rt;
+        }
     }
-    }else{
-        stallCounter += 1;
-    }
+    
 }
+
 
 void mainProcessor::writeBack(){
     if(MEM_WB.instruction != ""){
+       
         if(MEM_WB.opcode == "100011"){   //op = 35,  lw
             reg[stoi(MEM_WB.rt, nullptr, 2)] = MEM_WB.LMD;
         }
@@ -282,8 +274,6 @@ void mainProcessor::writeBack(){
                 reg[stoi(MEM_WB.rt, nullptr, 2)] = MEM_WB.ALUout;
             }
         }
-    }else{
-        stallCounter+=1;
     }
 
  }
